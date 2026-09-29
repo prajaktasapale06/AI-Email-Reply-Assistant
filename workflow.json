@@ -1,0 +1,199 @@
+{
+  "name": "AI Email Reply Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "82d901fb-5af6-400b-ade5-bcab2184bd45",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "T5BWtDmeHLdp8YQn",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Read the following incoming email and write a professional reply.\n\nIncoming email:\n\n{{ $json.snippet }}\n\nCreate a natural and appropriate reply to the sender.\n\nDo NOT send the email.\nOnly create the reply draft.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a helpful assistantYou are an AI Email Reply Assistant.\n\nYour job is to read incoming emails and create reply drafts.\n\nRules:\n\n1. Carefully understand the incoming email.\n2. Write a clear, natural and professional reply.\n3. Match the tone of the original email.\n4. Do not invent information.\n5. Do not make promises on behalf of the user.\n6. Keep the reply concise and relevant.\n7. Do not send emails.\n8. Your only job is to create a reply draft.\n9. The user must review and explicitly approve the reply before it is sent.\n10. Never assume that the user has approved a reply.\n\nAlways create a reply that the user can review before sending."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "0ffc473d-787f-42ba-ae38-03574a562d44",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"subject\": {\n      \"type\": \"string\",\n      \"description\": \"The subject line of the email reply\"\n    },\n    \"body\": {\n      \"type\": \"string\",\n      \"description\": \"The complete body of the email reply\"\n    }\n  },\n  \"required\": [\n    \"subject\",\n    \"body\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        208
+      ],
+      "id": "3e600a37-1d98-4810-8f7d-8a85d965103c",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "AI Draft Reply - Approval Required",
+        "message": "=Hello,\n\nThe AI has prepared the following reply:\n\n{{ $json.output.body }}\n\nPlease review it and edit the reply if needed.\nSubmit the final version you want to send.",
+        "responseType": "freeText",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        0
+      ],
+      "id": "f53915d0-1e28-4c18-9ece-3e5a1f7a734e",
+      "name": "Send message and wait for response",
+      
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "T5BWtDmeHLdp8YQn",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        208
+      ],
+      "id": "ab2002e8-e886-4a7f-8d15-371181bbca17",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "rZ0w1Qk0dmdcNE3G",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
+        "message": "={{ $('Send message and wait for response').item.json.data.text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "e7fba867-b643-4e22-84e1-0e61de99c38f",
+      "name": "Reply to a message",
+      
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "T5BWtDmeHLdp8YQn",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "Reply to a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "eb6674be-0ee3-4db3-ba35-916b33e079d3",
+  
+  },
+  "nodeGroups": [],
+  "id": "QS2nDizFVzmbSEeM",
+  "tags": []
+}
